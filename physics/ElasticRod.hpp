@@ -44,18 +44,21 @@ private:
     // Force acting on vertex i
     Vector3f force(int i);
     // Material curvature for (i,j)
-    Vector2f omega(int i, int j);
+    Vector2f omega(const Vector3f& kb,int i, int j);
     // Gradient of material curvature
     Matrix<float, 2, 3> omegaGrad(int i, int j, int k);
     // Compute gradient holonomy from gradient holonomy terms
     Vector3f gradHolonomy(int i, int j);
     // Energy derivative dEdX for vertex i
     Vector3f dEdX(int i);
-
+    // Compute Phi terms for Bishop Frame calculation
+    void computeCosAndSin(float sqMag, float& cosPhi, float& sinPhi);
     // Generates the bishop frames
     void compBishopFrames();
     // Recomputes the material frames
     void compMatFrames();
+    // Parallel transport in time
+    void parallelTransportFrameInTime(const Vector3f& prevEdge);
 
     // Bishop (rest) frames
     std::vector<BishopFrame> bishopFrames;

@@ -11,6 +11,8 @@ Vector3f ElasticRod::gravity = {0.0f, -0.25f, 0.0f};
 
 Vector3f ElasticRod::kappaB(int i)
 {
+    if(i==0)
+        return Vector3f::Zero();
     return (2.0f * edge(i-1).cross(edge(i))) /
            (initEdge(i).norm() * initEdge(i-1).norm() + edge(i-1).dot(edge(i)));
 }
@@ -55,10 +57,10 @@ Matrix3f ElasticRod::kappaBGrad(int i, int j)
         denom;
 }
 
-Vector2f ElasticRod::omega(int i, int j) {
+Vector2f ElasticRod::omega(const Vector3f& kb,int i, int j) 
+{
     assert(j == i-1 || j == i);
     j = std::clamp(j, 0, (int)(x.size() - 1));
-    const Vector3f kb = kappaB(i);
     return {kb.dot(M[j].m2), -kb.dot(M[j].m1)};
 }
 
@@ -73,7 +75,8 @@ Matrix<float, 2, 3> ElasticRod::omegaGrad(int i, int j, int k)
         m.row(1) = -M[j].m1;
         m *= kappaBGrad(i, k);
     }
-    return m - J * omega(k, j) * gradHolonomy(i, j).transpose();
+    const Vector3f kb = kappaB(k);
+    return m - J * omega(kb,k, j) * gradHolonomy(i, j).transpose();
 }
 
 Vector3f ElasticRod::gradHolonomy(int i, int j)
@@ -91,31 +94,57 @@ Vector3f ElasticRod::dEdX(int i)
     Vector3f f = Vector3f::Zero();
     for (int k = 1; k < x.size(); k++) {
         Vector3f pf = Vector3f::Zero();
+        const Vector3f kb = kappaB(k);
         for (int j = k-1; j <= k; j++) {
-            pf += omegaGrad(i, j, k).transpose() * B * (omega(k, j) - omega0[k][j-k]);
+            pf += omegaGrad(i, j, k).transpose() * B * (omega(kb,k, j) - omega0[k][j-k]);
         }
         f += pf / initEdgeLen(k);
     }
     return -f;
 }
 
+void ElasticRod::computeCosAndSin(float sqMag, float & cosPhi, float & sinPhi)
+{
+    cosPhi = sqrt(4.0f/(sqMag + 4.0f));
+    sinPhi = sqrt(sqMag/(sqMag + 4.0f));
+}
+
 void ElasticRod::compBishopFrames()
 {
     bishopFrames[0] = {u0, edge(0).cross(u0).normalized()};
-    for (int i = 0; i < x.size(); i++) {
+    for (int i = 1; i < x.size()-1; i++) 
+    {
         const Vector3f kb = kappaB(i);
-        const float angle = 2.0f * std::atan(kb.norm() / 2.0f);
-        AngleAxisf P_i(angle, kb);
-        Vector3f u = (P_i * bishopFrames[std::max(i-1, 0)].u).normalized();
-        Vector3f v = edge(i).cross(u).normalized();
-        bishopFrames[i] = {u, v};
+        const Vector3f kbNorm = kb.normalized();
+        // const float angle = 2.0f * std::atan(kb.norm() / 2.0f);
+        // if(std::isnan(angle))
+        //     std::cout<<"NAN";
+
+        // AngleAxisf P_i(angle, kb.normalized());
+        // Vector3f u = (P_i * bishopFrames[std::max(i-1, 0)].u).normalized();
+        // Vector3f v = edge(i).cross(u).normalized();
+        // bishopFrames[i] = {u, v};
+        
+        float cosPhi, sinPhi;
+        computeCosAndSin(kb.squaredNorm(), cosPhi, sinPhi);
+        if(1.0f - cosPhi < 1e-6f)
+        {
+            bishopFrames[i] = {bishopFrames[i-1].u, bishopFrames[i-1].v};
+            continue;
+        }
+        Quaternion rotationQuat(cosPhi, sinPhi * kbNorm.x(), sinPhi * kbNorm.y(), sinPhi * kbNorm.z());        
+        Quaternion uQuat(0.0f, bishopFrames[i-1].u.x(), bishopFrames[i-1].u.y(), bishopFrames[i-1].u.z());
+        Quaternion rotationQuatConjugate = rotationQuat.conjugate();
+        auto rotatedVec = rotationQuat * uQuat * rotationQuatConjugate;
+        Vector3f u = Vector3f(rotatedVec.x(), rotatedVec.y(), rotatedVec.z()).normalized();
+        bishopFrames[i] = {u, edge(i).cross(u).normalized()};      
     }
-    u0 = bishopFrames[0].u;
+    // u0 = bishopFrames[0].u;
 }
 
 void ElasticRod::compMatFrames()
 {
-    for (int i = 0; i < x.size(); i++) {
+    for (int i = 0; i < x.size()-1; i++) {
         // Since theta is always zero in our case, material frame is same as bishop frame
         /* M[i] = {
             std::cos(theta[i]) * bishopFrames[i].u + std::sin(theta[i]) * bishopFrames[i].v,
@@ -126,6 +155,25 @@ void ElasticRod::compMatFrames()
             bishopFrames[i].v
         };
     }
+}
+
+void ElasticRod::parallelTransportFrameInTime(const Vector3f& prevEdge)
+{
+    const Vector3f kb = 2*prevEdge.cross(edge(0)) / (prevEdge.norm() * edge(0).norm() + prevEdge.dot(edge(0)));
+    const Vector3f kbNorm = kb.normalized();
+    float cosPhi, sinPhi;
+    computeCosAndSin(kb.squaredNorm(), cosPhi, sinPhi);
+    if(1.0f - cosPhi < 1e-6f)
+    {
+        u0 = edge(0).cross(u0);
+        u0 = u0.cross(edge(0)).normalized();
+        return;
+    }
+    Quaternion rotationQuat(cosPhi, sinPhi * kbNorm.x(), sinPhi * kbNorm.y(), sinPhi * kbNorm.z());        
+    Quaternion uQuat(0.0f, u0.x(), u0.y(), u0.z());
+    Quaternion rotationQuatConjugate = rotationQuat.conjugate();
+    auto rotatedVec = rotationQuat * uQuat * rotationQuatConjugate;
+    u0 = Vector3f(rotatedVec.x(), rotatedVec.y(), rotatedVec.z()).normalized();
 }
 
 Vector3f ElasticRod::edge(int i)
@@ -172,10 +220,12 @@ ElasticRod::ElasticRod(const std::vector<glm::vec3> &verts)
 
 void ElasticRod::integrateFwEuler(float dt)
 {
+    Vector3f prevEdge = edge(0);
     for (int i = 0; i < e.size(); i++) {
         e[i] = x[i+1] - x[i];
     }
 
+    parallelTransportFrameInTime(prevEdge);
     compBishopFrames();
     compMatFrames();
 
@@ -295,9 +345,13 @@ void ElasticRod::reset()
     compMatFrames();
 
     // Compute initial material curvature
-    for (int i = 0; i < x.size(); i++) {
-        for (int j = 0; j < 2; j++) {
-            omega0[i][j] = omega(i, i + j-1);
+    omega0[0] = {Vector2f::Zero(), Vector2f::Zero()};
+    for (int i = 1; i < x.size()-1; i++) 
+    {
+        const Vector3f kb = kappaB(i);
+        for (int j = 0; j < 2; j++)
+        {
+            omega0[i][j] = omega(kb,i, i + j-1);
         }
     }
 }
