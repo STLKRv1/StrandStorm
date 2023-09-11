@@ -90,6 +90,8 @@ public:
     static float bendingStiffness;
     // Used in voxel velocity update
     static float friction, sampledVelocityScale;
+    // Max force norm
+    static float maxForce;
 
     ElasticRod() = default;
     ElasticRod(const std::vector<glm::vec3>& verts);

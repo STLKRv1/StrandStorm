@@ -7,6 +7,7 @@ float ElasticRod::drag = 10.0f;
 float ElasticRod::bendingStiffness = 0.003f;
 float ElasticRod::friction = 0.0f;
 float ElasticRod::sampledVelocityScale = 0.0001f;
+float ElasticRod::maxForce = 100.f;
 Vector3f ElasticRod::gravity = {0.0f, -0.25f, 0.0f};
 
 Vector3f ElasticRod::kappaB(int i)
@@ -81,25 +82,38 @@ Matrix<float, 2, 3> ElasticRod::omegaGrad(int i, int j, int k)
 
 Vector3f ElasticRod::gradHolonomy(int i, int j)
 {
-    Vector3f gh = Vector3f::Zero();
-    for (int k = 1; k <= j; k++) {
-        gh += psiGrad(k, i);
-    }
-    return gh;
+    // Vector3f gh = Vector3f::Zero();
+    // for (int k = 1; k <= j; k++) {
+    //     gh += psiGrad(k, i);
+    // }
+    if(std::abs(j-i)>1)
+        return Vector3f::Zero();
+    Vector3f kb = kappaB(j);
+    if(j==i+1)
+        return kb / (2.0f * initEdge(i).norm());
+    else if(j==i-1)
+        return -kb / (2.0f * initEdge(j).norm());
+    else
+        return -(kb/(2.0f * initEdge(i).norm())) + (kb / (2.0f * initEdge(j).norm()));
 }
 
 Vector3f ElasticRod::dEdX(int i)
 {
     const Matrix2f B = Matrix2f::Identity() * this->bendingStiffness;
     Vector3f f = Vector3f::Zero();
-    for (int k = 1; k < x.size(); k++) {
+    // i-1 instead of 1 because the terms go to 0 for k<i-1
+    for (int k = std::max(i-1,1); k < x.size()-1; k++) 
+    {
         Vector3f pf = Vector3f::Zero();
         const Vector3f kb = kappaB(k);
-        for (int j = k-1; j <= k; j++) {
-            pf += omegaGrad(i, j, k).transpose() * B * (omega(kb,k, j) - omega0[k][j-k]);
+        for (int j = k-1; j <= k; j++) 
+        {
+            pf += omegaGrad(i, j, k).transpose() * B * (omega(kb,k, j) - omega0[k][j-k+1]);
         }
         f += pf / initEdgeLen(k);
     }
+    if(f.squaredNorm() > maxForce * maxForce)
+        f = f.normalized() * maxForce;
     return -f;
 }
 
@@ -191,7 +205,9 @@ Vector3f ElasticRod::initEdge(int i)
 Vector3f ElasticRod::force(int i)
 {
     assert(i >= 1);
-    return dEdX(i);
+    Vector3f f = dEdX(i);
+    assert(std::isfinite(f.norm()));
+    return f;
 }
 
 void ElasticRod::init(const std::vector<glm::vec3> &verts)
@@ -232,7 +248,7 @@ void ElasticRod::integrateFwEuler(float dt)
     px = x;
     for (int i = 1; i < x.size(); i++) 
     {
-        v[i] += (force(i) + gravity) * dt;
+        v[i] += (force(i) + gravity) * dt ;
         v[i] -= 0.5f * drag * v[i].squaredNorm() * v[i].normalized() * dt;
         x[i] += v[i] * dt;
     }
