@@ -46,7 +46,7 @@ private:
     void growControlHair(const glm::vec3& root, const glm::vec3& dir);
 public:
     // Number of vertices in each control hair (N)
-    static constexpr uint32_t controlHairLen = 10;
+    static constexpr uint32_t controlHairLen = 30;
     // Number of subdivisions between each control hair vertex (M)
     //  Includes start vertex, so needs to be >=1
     static constexpr uint32_t subdivide = 3;
@@ -55,11 +55,11 @@ public:
     // Hair growth amount per control vert
     static constexpr float hairGrowth = 0.05f;
     // Amount to randomly perturb control hair vertices
-    static constexpr float controlHairRandomize = 0.01f;
+    static constexpr float controlHairRandomize = 0.015f;
     ///DEBUG: control hair duplication
     static constexpr uint32_t controlHairDensity = 0;
     ///DEBUG: max number of control hairs, -1 for unlimited
-    static constexpr int maxControlHairs = -1;
+    static constexpr int maxControlHairs = 50;
 
     // Vertices for control hairs
     std::vector<glm::vec4> controlVerts;

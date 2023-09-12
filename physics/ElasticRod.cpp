@@ -3,11 +3,13 @@
 #include <spdlog/fmt/fmt.h>
 
 // Elastic rod sim constants
-float ElasticRod::drag = 10.0f;
+float ElasticRod::drag = 5.0f;
 float ElasticRod::bendingStiffness = 0.003f;
 float ElasticRod::friction = 0.0f;
 float ElasticRod::sampledVelocityScale = 0.0001f;
 float ElasticRod::maxForce = 200.f;
+float ElasticRod::FTLdamping = 0.75f;
+int ElasticRod::pbdIterations = 1;
 Vector3f ElasticRod::gravity = {0.0f, -0.25f, 0.0f};
 
 Vector3f ElasticRod::kappaB(int i)
@@ -284,19 +286,26 @@ void ElasticRod::handleCollisions(const std::vector<std::shared_ptr<SceneObject>
 
 void ElasticRod::enforceConstraints(float dt, const std::vector<std::shared_ptr<SceneObject>>& colliders)
 {
-    handleCollisions(colliders);
-    x[0] = xRest[0];
     std::vector<Vector3f> dx(x.size());
-    dx[0] = Vector3f::Zero();
-    for (int i = 1; i < x.size(); i++) {
-        // Inextensibility: needs to be perfectly inextensible otherwise problem
-        dx[i] = x[i-1] + (x[i] - x[i-1]).normalized() * initEdge(i-1).norm() - x[i];
-        x[i] += dx[i];
-        // v[i] -= 0.5f * drag * v[i].squaredNorm() * v[i].normalized() * dt;
+
+    for(int iters=0;iters<pbdIterations;iters++)
+    {
+        handleCollisions(colliders);
+        x[0] = xRest[0];
+        dx[0] = Vector3f::Zero();
+        for (int i = 1; i < x.size(); i++) {
+            // Inextensibility: needs to be perfectly inextensible otherwise problem
+            dx[i] = x[i-1] + (x[i] - x[i-1]).normalized() * initEdge(i-1).norm() - x[i];
+            x[i] += dx[i];
+        }
     }
-    for (int i = 1; i < x.size()-1; i++) {
+
+    for (int i = 1; i < x.size(); i++) {
         // Velocity must be corrected according to position correction
-        v[i] = (x[i] - px[i]) / dt - 0.25f * (dx[i+1] / dt);
+        v[i] = x[i] - px[i];
+        if (i+1 < x.size()-1)
+            v[i] -= FTLdamping * dx[i+1];
+        v[i] /= dt;
     }
 }
 

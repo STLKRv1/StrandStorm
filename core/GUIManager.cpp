@@ -312,6 +312,10 @@ void GUIManager::DrawRodParameters()
                          &ElasticRod::drag, 1.0f, 0.0f, 400.0f, "%.4f");
         ImGui::DragFloat("bending stiffness",
                          &ElasticRod::bendingStiffness, 0.001f, 0.0f, 0.1f, "%.4f");
+        ImGui::DragInt("pbd iterations",
+                        &ElasticRod::pbdIterations, 1, 1, 100);
+        ImGui::DragFloat("FTL damping",
+                         &ElasticRod::FTLdamping, 0.1f, 0.0f, 1.0f, "%.4f");
         ImGui::DragFloat("Voxel Friciton",
                          &ElasticRod::friction, 0.001f, 0.0f, 1.0f);
         ImGui::DragFloat("Sample Scaling",

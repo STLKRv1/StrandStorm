@@ -94,8 +94,10 @@ public:
     static float friction, sampledVelocityScale;
     // Max force norm
     static float maxForce;
-    //
+    // Iterations for PBD constraint solve
     static int pbdIterations;
+    // FTL velocity damping
+    static float FTLdamping;
 
     ElasticRod() = default;
     ElasticRod(const std::vector<glm::vec3>& verts);
