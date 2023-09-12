@@ -51,6 +51,8 @@ private:
     Vector3f gradHolonomy(int i, int j);
     // Energy derivative dEdX for vertex i
     Vector3f dEdX(int i);
+    // Energy derivative dEdTheta for vertex n
+    float dEdTheta();
     // Compute Phi terms for Bishop Frame calculation
     void computeCosAndSin(float sqMag, float& cosPhi, float& sinPhi);
     // Generates the bishop frames
@@ -92,6 +94,8 @@ public:
     static float friction, sampledVelocityScale;
     // Max force norm
     static float maxForce;
+    //
+    static int pbdIterations;
 
     ElasticRod() = default;
     ElasticRod(const std::vector<glm::vec3>& verts);

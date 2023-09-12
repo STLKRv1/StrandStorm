@@ -7,7 +7,7 @@ float ElasticRod::drag = 10.0f;
 float ElasticRod::bendingStiffness = 0.003f;
 float ElasticRod::friction = 0.0f;
 float ElasticRod::sampledVelocityScale = 0.0001f;
-float ElasticRod::maxForce = 100.f;
+float ElasticRod::maxForce = 200.f;
 Vector3f ElasticRod::gravity = {0.0f, -0.25f, 0.0f};
 
 Vector3f ElasticRod::kappaB(int i)
@@ -114,7 +114,10 @@ Vector3f ElasticRod::dEdX(int i)
     }
     if(f.squaredNorm() > maxForce * maxForce)
         f = f.normalized() * maxForce;
-    return -f;
+    f = -f;
+    float dEdTh = dEdTheta();
+    f += dEdTh * gradHolonomy(i, x.size()-2);
+    return f;
 }
 
 void ElasticRod::computeCosAndSin(float sqMag, float & cosPhi, float & sinPhi)
@@ -200,6 +203,17 @@ Vector3f ElasticRod::initEdge(int i)
 {
     i = std::clamp(i, 0, (int)(x.size() - 2));
     return xRest[i + 1] - xRest[i];
+}
+
+float ElasticRod::dEdTheta()
+{    
+    const Vector3f kb = kappaB(x.size()-2);
+    const Matrix2f B = Matrix2f::Identity() * this->bendingStiffness;
+    Vector2f wnn = omega(kb,(int)x.size()-2, (int)x.size()-2);
+    float dEdTheta = wnn.transpose() * J * B * (wnn - omega0[x.size()-2][1]);
+    // The second term is ignored because twist is 0
+    dEdTheta /= initEdgeLen(x.size()-2);
+    return -dEdTheta;
 }
 
 Vector3f ElasticRod::force(int i)
