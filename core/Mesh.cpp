@@ -48,7 +48,9 @@ void HairMesh::loadFromFile(const std::string &modelPath, bool compNormals)
 
     // normalize the mesh to fit in a 5x5x5 cube
     mesh.ComputeBoundingBox();
-    const auto scale =  1.0f / mesh.GetBoundMax().y;
+    float yFactor = mesh.GetBoundMax().y;
+    yFactor = yFactor == 0.0 ? 1.0f : yFactor;
+    const auto scale =  1.0f / yFactor;
     //go over the vertices and scale them
     for (int i = 0; i < mesh.NV(); i++) {
         mesh.V(i) *= scale;

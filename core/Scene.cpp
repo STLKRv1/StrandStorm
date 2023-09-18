@@ -31,7 +31,7 @@ void Scene::init(const Renderer& r)
     dummy->mesh.build(r.surfaceProg);
     dummy->position = {0.0f, 2.0f, 0.0f};
     dummy->scale /= 2.0f;
-    dummy->collider = std::make_shared<SphereCollider>(Eigen::Vector3f(0.0f,0.0f,0.0f), 0.5f);
+    dummy->collider = std::make_shared<SphereCollider>(Eigen::Vector3f(&dummy->position[0]), 0.5f);
     sceneObjects.push_back(dummy);
 
     //set Marschner luts
